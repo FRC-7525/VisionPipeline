@@ -45,7 +45,54 @@ def splitByAngle(lines):
     
     return avgLines
 
-def drawLines(lines,frame):
+def getBisectors(lines):
+    bisectors = []
+    lineArray = np.array(lines)
+    for i in range(len(lineArray)):
+        for j in range(i+1, len(lineArray)):
+            if i == j:
+                continue
+            temp = intersection(lineArray[i], lineArray[j])
+            data = [temp[0], temp[1], (lineArray[i][1]+lineArray[j][1])/2]
+            bisectors.append(data)
+    return bisectors
+
+def pointSlopeIntersection(line1, line2):
+    x1, y1, theta1 = line1
+    x2, y2, theta2 = line2
+    
+    m1 = np.tan(theta1)
+    m2 = np.tan(theta2)
+    
+    x0 = (m1*x1 - y1 - m2*x2 + y2)/(m1 - m2)
+    y0 = m1*(x0 - x1) + y1
+    
+    x0, y0 = int(np.round(x0)), int(np.round(y0))
+    return [x0, y0]
+
+def getBisectorIntersections(bisectors):
+    intersections = []
+    for i in range(len(bisectors)):
+        for j in range(i+1, len(bisectors)):
+            intersections.append(pointSlopeIntersection(bisectors[i], bisectors[j]))
+    return intersections
+
+def drawBisectors(bisectors, frame):
+    for line in bisectors:
+        try:
+            x0, y0, theta = line
+            
+            x1 = 0
+            y1 = int(np.rint(np.tan(theta) * (x1 - x0) + y0))
+            
+            x2 = 1000
+            y2 = int(np.rint(np.tan(theta) * (x2 - x0) + y0))
+            
+            cv2.line(frame, (x1,y1), (x2, y2), (255,0,0), 1)
+        except:
+            print("Some Error")
+
+def drawHoughLines(lines,frame):
     for line in lines:
         
         subRho = line[0]
@@ -67,7 +114,7 @@ def drawLines(lines,frame):
 def drawIntersections(intersections, frame):
     for x, y in intersections:
         try:
-            cv2.circle(frame, (x,y), 3, (255,0,0), -1)
+            cv2.circle(frame, (x,y), 3, (255,0,255), -1)
         except Exception as ex:
             print("Unknown Error: " + str(ex))
 
@@ -84,7 +131,7 @@ cannyThreshUpper = 200
 
 rho = 1
 theta = np.pi/180
-houghThreshold = 75
+houghThreshold = 70
 
 if cap is None:
     sys.exit(1)
@@ -112,18 +159,26 @@ while(1):
     
     try:
         segments = splitByAngle(lines)
-        flattened = [[line[0], np.pi/2] for line in segments]
-        #intersections = segmentedIntersection(flattened)
+        intersections = segmentedIntersection(segments)
     except Exception as ex:
         print("Linear Algebra Error: " + str(ex))
     
-    #if len(intersections) == 0:
-        #continue
+    if len(intersections) == 0:
+        continue
     
-    drawLines(segments,frame)
+    bisectors = []
+    bisectorIntersections = []
     
-    #drawIntersections(intersections, frame)
-                                                       
+    try:
+        bisectors = getBisectors(segments)
+        bisectorIntersections = getBisectorIntersections(bisectors)
+    except Exception as ex:
+        print("Error getting bisectors: " + str(ex))
+    
+    drawHoughLines(segments,frame)
+    drawBisectors(bisectors, frame)
+    drawIntersections(bisectorIntersections, frame)
+    
     cv2.imshow("Intersections", frame)
     
     k = cv2.waitKey(5) & 0xFF
@@ -133,6 +188,3 @@ while(1):
 cap.release()
 cv2.destroyAllWindows()
 sys.exit(0)
-
-
-    
